@@ -175,6 +175,56 @@ var p = BaseNode.prototype;
     }
 
     /**
+     * This is the main method to propagate the tick signal to this node, if it
+     * is an asynchronous node. This method calls all callbacks: `enter`, 
+     * `open`,`tick`, `close`, and `exit`. It only opens a node if it is not 
+     * already open. In the same way, this method only close a node if the node
+     * returned a status different of `b3.RUNNING`.
+     *
+     * @method _execute
+     * @param {Tick} tick A tick instance.
+     * @returns {Constant} The tick state.
+     * @protected
+    **/
+    p._asyncExecute = function(tick) {
+        /* ENTER */
+        this._enter(tick);
+
+        /* OPEN */
+        if (!tick.blackboard.get('isOpen', tick.tree.id, this.id)) {
+            this._open(tick);
+        }
+
+        /* TICK */
+        var self = this;
+        var promise = this._tick(tick).then(function (status) {
+            /* CLOSE */
+            if (status !== b3.RUNNING) {
+                self._close(tick);
+            }
+
+            /* EXIT */
+            self._exit(tick);
+
+            return status;
+        });
+
+        return promise;
+    }
+
+    /**
+     * This is a utility function that asynchronous nodes use to override
+     * the original `_execute` function to prevent calling asynchronous
+     * nodes in a synchronous way.
+     *
+     * @method _syncExecuteError
+     * @protected
+    **/
+    p._syncExecuteError = function () {
+        throw new Error("Cannot call synchronous '_execute' of an asynchronous node!");
+    }
+
+    /**
      * Wrapper for enter method.
      *
      * @method _enter
